@@ -1,0 +1,514 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  USER
+  ADMIN
+  NUTRITIONIST
+}
+
+enum SubscriptionStatus {
+  FREE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum SubscriptionInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACKS
+}
+
+enum ActivityLevel {
+  SEDENTARY
+  LIGHT
+  MODERATE
+  VERY_ACTIVE
+}
+
+enum DietType {
+  STANDARD
+  VEGETARIAN
+  VEGAN
+  KETO
+  PALEO
+  MEDITERRANEAN
+}
+
+enum GoalType {
+  LOSE_WEIGHT
+  MAINTAIN_WEIGHT
+  GAIN_MUSCLE
+}
+
+enum GroceryCategory {
+  PRODUCE
+  PROTEIN
+  DAIRY_AND_EGGS
+  GRAINS_AND_PANTRY
+  NUTS_AND_SEEDS
+  CONDIMENTS_AND_OILS
+  BEVERAGES
+}
+
+enum CommunityPostType {
+  TEXT
+  PHOTO
+  MILESTONE
+}
+
+enum CommunityReactionType {
+  LIKE
+  FIRE
+  STRONG
+  CLAP
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  name            String
+  role            Role     @default(USER)
+  isEmailVerified Boolean  @default(false)
+  avatarUrl       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  profile         UserProfile?
+  refreshTokens   RefreshToken[]
+  mealLogs        MealLog[]
+  weightEntries   WeightEntry[]
+  mealPlans       MealPlan[]
+  groceryLists    GroceryList[]
+  subscription    Subscription?
+  pushTokens      PushToken[]
+  waterLogs       WaterLog[]
+  achievements    UserAchievement[]
+  notifications   Notification[]
+  conversations    Conversation[]      @relation("MemberConversations")
+  nutritionistConvs Conversation[]     @relation("NutritionistConversations")
+  sentMessages     Message[]
+  communityPosts   CommunityPost[]
+  communityComments CommunityComment[]
+  communityReactions CommunityReaction[]
+  communityReports CommunityReport[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id             String        @id @default(cuid())
+  userId         String        @unique
+  goalType       GoalType      @default(LOSE_WEIGHT)
+  startWeight    Float
+  currentWeight  Float
+  targetWeight   Float
+  height         Float?
+  dateOfBirth    DateTime?
+  activityLevel  ActivityLevel @default(MODERATE)
+  dietType       DietType      @default(STANDARD)
+  allergies      String[]      @default([])
+  mealsPerDay    Int           @default(3)
+  dailyKcalGoal  Int           @default(1800)
+  dailyWaterGoal Float         @default(2.5)
+  streak         Int           @default(0)
+  longestStreak  Int           @default(0)
+  lastActiveDate DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ─── Meals ────────────────────────────────────────────────────────────────────
+
+model Meal {
+  id           String     @id @default(cuid())
+  name         String
+  type         MealType
+  kcal         Int
+  protein      Float
+  carbs        Float
+  fats         Float
+  fiber        Float      @default(0)
+  sugar        Float      @default(0)
+  imageUrl     String?
+  ingredients  String[]
+  instructions String[]
+  tags         String[]   @default([])
+  dietTypes    DietType[]
+  allergens    String[]   @default([])
+  prepTimeMins Int        @default(0)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  mealPlanItems MealPlanItem[]
+  mealLogs      MealLog[]
+
+  @@map("meals")
+}
+
+model MealPlan {
+  id          String         @id @default(cuid())
+  userId      String
+  weekStart   DateTime
+  weekEnd     DateTime
+  totalKcal   Int
+  notes       String?
+  status      String   @default("DRAFT")
+  publishedAt DateTime?
+  createdBy   String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       MealPlanItem[]
+  groceryList GroceryList?
+
+  @@unique([userId, weekStart])
+  @@map("meal_plans")
+}
+
+model MealPlanItem {
+  id          String    @id @default(cuid())
+  mealPlanId  String
+  mealId      String
+  dayOfWeek   Int
+  mealType    MealType
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  swappedFrom String?
+
+  mealPlan    MealPlan  @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  meal        Meal      @relation(fields: [mealId], references: [id])
+
+  @@map("meal_plan_items")
+}
+
+model MealLog {
+  id       String   @id @default(cuid())
+  userId   String
+  mealId   String?
+  name     String
+  mealType MealType
+  kcal     Int
+  protein  Float    @default(0)
+  carbs    Float    @default(0)
+  fats     Float    @default(0)
+  loggedAt DateTime @default(now())
+  notes    String?
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meal     Meal?    @relation(fields: [mealId], references: [id])
+
+  @@map("meal_logs")
+}
+
+// ─── Progress ─────────────────────────────────────────────────────────────────
+
+model WeightEntry {
+  id       String   @id @default(cuid())
+  userId   String
+  weight   Float
+  note     String?
+  loggedAt DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, loggedAt])
+  @@map("weight_entries")
+}
+
+model WaterLog {
+  id       String   @id @default(cuid())
+  userId   String
+  amount   Float
+  loggedAt DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("water_logs")
+}
+
+model Achievement {
+  id          String            @id @default(cuid())
+  key         String            @unique
+  title       String
+  description String
+  icon        String
+  condition   Json
+
+  users       UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
+
+// ─── Grocery ──────────────────────────────────────────────────────────────────
+
+model GroceryList {
+  id         String        @id @default(cuid())
+  userId     String
+  mealPlanId String?       @unique
+  weekStart  DateTime
+  totalCost  Float?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealPlan   MealPlan?     @relation(fields: [mealPlanId], references: [id])
+  items      GroceryItem[]
+
+  @@map("grocery_lists")
+}
+
+model GroceryItem {
+  id            String          @id @default(cuid())
+  groceryListId String
+  name          String
+  quantity      String
+  category      GroceryCategory
+  checked       Boolean         @default(false)
+  checkedAt     DateTime?
+  estimatedCost Float?
+  note          String?
+  sortOrder     Int             @default(0)
+
+  groceryList   GroceryList     @relation(fields: [groceryListId], references: [id], onDelete: Cascade)
+
+  @@map("grocery_items")
+}
+
+// ─── Subscription ─────────────────────────────────────────────────────────────
+
+model Subscription {
+  id                   String                @id @default(cuid())
+  userId               String                @unique
+  paystackCustomerId     String?              @unique
+  paystackSubscriptionCode String?
+  paystackPlanCode         String?
+  paystackEmailToken       String?
+  status               SubscriptionStatus    @default(FREE)
+  interval             SubscriptionInterval?
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean               @default(false)
+  canceledAt           DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("push_tokens")
+}
+
+model Notification {
+  id     String   @id @default(cuid())
+  userId String
+  title  String
+  body   String
+  data   Json?
+  sentAt DateTime @default(now())
+  readAt DateTime?
+  type   String
+
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ─── Messaging ────────────────────────────────────────────────────────────────
+
+model Conversation {
+  id               String    @id @default(cuid())
+  memberId         String
+  nutritionistId   String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lastMessageAt    DateTime?
+  lastMessageBody  String?
+
+  member           User      @relation("MemberConversations",       fields: [memberId],       references: [id], onDelete: Cascade)
+  nutritionist     User      @relation("NutritionistConversations", fields: [nutritionistId], references: [id], onDelete: Cascade)
+  messages         Message[]
+
+  @@unique([memberId, nutritionistId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  senderRole     Role
+  body           String
+  sentAt         DateTime     @default(now())
+  readAt         DateTime?
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+// ─── Community ────────────────────────────────────────────────────────────────
+
+model CommunityPost {
+  id             String            @id @default(cuid())
+  authorId       String
+  type           CommunityPostType @default(TEXT)
+  content        String?
+  milestoneKey   String?
+  milestoneMeta  Json?
+  visibility     String            @default("PUBLIC")
+  likesCount     Int               @default(0)
+  commentsCount  Int               @default(0)
+  reactionsCount Int               @default(0)
+  reportsCount   Int               @default(0)
+  isHidden       Boolean           @default(false)
+  hiddenReason   String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  author         User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  media          CommunityPostMedia[]
+  comments       CommunityComment[]
+  reactions      CommunityReaction[]
+  reports        CommunityReport[]
+
+  @@index([isHidden, createdAt(sort: Desc)])
+  @@index([authorId, createdAt(sort: Desc)])
+  @@map("community_posts")
+}
+
+model CommunityPostMedia {
+  id        String   @id @default(cuid())
+  postId    String
+  url       String
+  mimeType  String?
+  width     Int?
+  height    Int?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, sortOrder])
+  @@map("community_post_media")
+}
+
+model CommunityComment {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  body      String
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt(sort: Desc)])
+  @@map("community_comments")
+}
+
+model CommunityReaction {
+  id           String                @id @default(cuid())
+  postId       String
+  userId       String
+  reactionType CommunityReactionType
+  createdAt    DateTime              @default(now())
+
+  post         CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId, reactionType])
+  @@index([postId, createdAt(sort: Desc)])
+  @@map("community_reactions")
+}
+
+model CommunityReport {
+  id         String   @id @default(cuid())
+  postId     String
+  reporterId String
+  reason     String
+  details    String?
+  createdAt  DateTime @default(now())
+
+  post       CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter   User          @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, reporterId])
+  @@index([postId, createdAt(sort: Desc)])
+  @@map("community_reports")
+}
