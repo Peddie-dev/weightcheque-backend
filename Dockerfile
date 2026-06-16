@@ -1,5 +1,6 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
@@ -15,6 +16,7 @@ RUN npm run build
 
 # ── Stage 2: Production ───────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
@@ -27,6 +29,7 @@ RUN npm ci --omit=dev --ignore-scripts
 
 # Prisma client
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY prisma ./prisma
 
 # Built app
