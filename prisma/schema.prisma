@@ -121,27 +121,36 @@ model User {
 }
 
 model UserProfile {
-  id             String        @id @default(cuid())
-  userId         String        @unique
-  goalType       GoalType      @default(LOSE_WEIGHT)
-  startWeight    Float
-  currentWeight  Float
-  targetWeight   Float
-  height         Float?
-  dateOfBirth    DateTime?
-  activityLevel  ActivityLevel @default(MODERATE)
-  dietType       DietType      @default(STANDARD)
-  allergies      String[]      @default([])
-  mealsPerDay    Int           @default(3)
-  dailyKcalGoal  Int           @default(1800)
-  dailyWaterGoal Float         @default(2.5)
-  streak         Int           @default(0)
-  longestStreak  Int           @default(0)
-  lastActiveDate DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  userId             String        @unique
+  goalType           GoalType      @default(LOSE_WEIGHT)
+  startWeight        Float
+  currentWeight      Float
+  targetWeight       Float
+  height             Float?
+  dateOfBirth        DateTime?
+  activityLevel      ActivityLevel @default(MODERATE)
+  dietType           DietType      @default(STANDARD)
+  allergies          String[]      @default([])
+  mealsPerDay        Int           @default(3)
+  dailyKcalGoal      Int           @default(1800)
+  dailyWaterGoal     Float         @default(2.5)
+  streak             Int           @default(0)
+  longestStreak      Int           @default(0)
+  lastActiveDate     DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // New fields
+  gender             String?
+  waistCircumference Float?
+  medicalConditions  String[]      @default([])
+  medications        String?
+  sleepHours         String?
+  focusTime          String?
+  foodTriggers       String?
+
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_profiles")
 }
