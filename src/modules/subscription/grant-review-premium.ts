@@ -1,16 +1,17 @@
+import 'dotenv/config';
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = "reviewer@weightcheque.com";
+  const email = "henryedwin92@gmail.com";
 
   const user = await prisma.user.findUnique({
     where: { email },
   });
 
   if (!user) {
-    throw new Error("Reviewer account not found");
+    throw new Error("account not found");
   }
 
   await prisma.subscription.upsert({
