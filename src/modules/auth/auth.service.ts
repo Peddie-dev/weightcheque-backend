@@ -126,7 +126,17 @@ export const authService = {
       const fullName = [dto.firstName, dto.lastName].filter(Boolean).join(' ');
       await prisma.user.update({ where: { id: userId }, data: { name: fullName } });
     }
-    const dateOfBirth = dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined;
+    const dateOfBirth = (() => {
+  if (!dto.dateOfBirth) return undefined;
+  // Parse DD/MM/YYYY format
+  const parts = dto.dateOfBirth.split('/');
+  if (parts.length === 3) {
+    const date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    return isNaN(date.getTime()) ? undefined : date;
+  }
+  const date = new Date(dto.dateOfBirth);
+  return isNaN(date.getTime()) ? undefined : date;
+})();
     const profile = await prisma.userProfile.upsert({
       where: { userId },
       update: {
